@@ -1,45 +1,367 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EventHorizon Ticketing</title>
+    
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-      body {
-        font-family: 'Inter', sans-serif;
-        background-color: #0f172a; /* Slate 900 */
-        color: #f8fafc;
-      }
-      /* Custom scrollbar for webkit */
-      ::-webkit-scrollbar {
-        width: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #1e293b;
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #475569;
-        border-radius: 4px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #64748b;
-      }
-    </style>
-  <script type="importmap">
+    
+    <!-- Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Import Map for Gemini SDK -->
+    <script type="importmap">
 {
   "imports": {
+    "@google/genai": "https://esm.sh/@google/genai@^1.41.0",
     "react": "https://esm.sh/react@^19.2.4",
     "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
     "react/": "https://esm.sh/react@^19.2.4/",
     "recharts": "https://esm.sh/recharts@^3.7.0",
-    "@google/genai": "https://esm.sh/@google/genai@^1.41.0"
+    "html5-qrcode": "https://esm.sh/html5-qrcode@^2.3.8",
+    "qrcode": "https://esm.sh/qrcode@^1.5.4"
   }
 }
 </script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a; /* Slate 950 */
+            color: #f8fafc;
+            overflow-x: hidden;
+        }
+
+        /* Animations */
+        @keyframes fade-in {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .animate-fade-in { animation: fade-in 0.5s ease-out forwards; }
+
+        @keyframes slide-up {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-slide-up { animation: slide-up 0.5s ease-out forwards; }
+
+        @keyframes tilt {
+            0%, 50%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(1deg); }
+            75% { transform: rotate(-1deg); }
+        }
+        .animate-tilt { animation: tilt 10s infinite linear; }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+        /* Utilities */
+        .hidden-view { display: none !important; }
+        .perspective-1000 { perspective: 1000px; }
+        
+        /* QR Reader specific overrides */
+        #reader { border: none !important; }
+        #reader video { object-fit: cover; border-radius: 0.5rem; }
+    </style>
 </head>
-  <body>
-    <div id="root"></div>
-  </body>
+<body class="min-h-screen relative selection:bg-indigo-500 selection:text-white">
+
+    <!-- Background Effects -->
+    <div class="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
+        <div class="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] bg-indigo-900/20 rounded-full blur-[120px]"></div>
+        <div class="absolute top-[40%] -right-[10%] w-[40%] h-[40%] bg-purple-900/20 rounded-full blur-[120px]"></div>
+        <div class="absolute bottom-[-10%] left-[20%] w-[30%] h-[30%] bg-emerald-900/10 rounded-full blur-[100px]"></div>
+    </div>
+
+    <div class="relative z-10 container mx-auto p-4 md:p-6">
+        
+        <!-- Navbar -->
+        <nav class="flex justify-between items-center py-6 mb-4">
+            <div onclick="window.app.navigateTo('LANDING')" class="text-xl font-bold tracking-tighter flex items-center gap-2 cursor-pointer select-none">
+                <div class="w-8 h-8 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center text-xs font-bold shadow-lg shadow-indigo-500/30 text-white">EH</div>
+                <span>EventHorizon</span>
+            </div>
+            <div id="nav-badge" class="hidden text-xs font-mono text-slate-500 border border-slate-800 px-2 py-1 rounded bg-slate-900/50">
+                <!-- Mode inserted via JS -->
+            </div>
+        </nav>
+
+        <!-- VIEW: Landing -->
+        <section id="view-landing" class="view-section flex flex-col items-center justify-center min-h-[70vh] text-center space-y-12 animate-fade-in px-4">
+            <div class="space-y-4 max-w-3xl">
+                <h1 class="text-6xl md:text-7xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-indigo-200 to-indigo-400">
+                    EVENT HORIZON
+                </h1>
+                <p class="text-xl md:text-2xl text-slate-400 font-light">
+                    The nexus of technology and imagination awaits.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl mt-8">
+                <!-- Participant Card -->
+                <div onclick="window.app.navigateTo('REGISTER')" class="group bg-slate-800/50 backdrop-blur-sm border border-slate-700 hover:border-indigo-500 rounded-3xl p-8 cursor-pointer transition-all hover:transform hover:scale-105 hover:bg-slate-800 text-left relative overflow-hidden">
+                    <div class="absolute top-0 right-0 p-32 bg-indigo-500/10 rounded-full blur-3xl group-hover:bg-indigo-500/20 transition-all"></div>
+                    <div class="relative z-10">
+                        <div class="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-indigo-500/20">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg>
+                        </div>
+                        <h3 class="text-2xl font-bold text-white mb-2">Participant Portal</h3>
+                        <p class="text-slate-400">Register for the event, generate your personalized badge, and get your digital ticket.</p>
+                        <div class="mt-6 flex items-center text-indigo-400 font-medium group-hover:translate-x-2 transition-transform">
+                            Enter Portal &rarr;
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Admin Card -->
+                <div onclick="window.app.navigateTo('ADMIN')" class="group bg-slate-800/50 backdrop-blur-sm border border-slate-700 hover:border-emerald-500 rounded-3xl p-8 cursor-pointer transition-all hover:transform hover:scale-105 hover:bg-slate-800 text-left relative overflow-hidden">
+                    <div class="absolute top-0 right-0 p-32 bg-emerald-500/10 rounded-full blur-3xl group-hover:bg-emerald-500/20 transition-all"></div>
+                    <div class="relative z-10">
+                        <div class="w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-emerald-500/20">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                        </div>
+                        <h3 class="text-2xl font-bold text-white mb-2">Organizing Committee</h3>
+                        <p class="text-slate-400">Manage gate entry, scan attendee QR codes, and monitor real-time event analytics.</p>
+                        <div class="mt-6 flex items-center text-emerald-400 font-medium group-hover:translate-x-2 transition-transform">
+                            Access Dashboard &rarr;
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- VIEW: Registration -->
+        <section id="view-register" class="view-section hidden-view flex flex-col items-center justify-center min-h-[70vh] px-4 animate-slide-up w-full">
+            <div class="w-full max-w-md mb-4">
+                <button onclick="window.app.navigateTo('LANDING')" class="text-slate-400 hover:text-white flex items-center gap-2 mb-4 transition-colors">
+                    &larr; Back to Home
+                </button>
+            </div>
+            
+            <div class="w-full max-w-md mx-auto bg-slate-800 p-8 rounded-2xl shadow-2xl border border-slate-700">
+                <div class="mb-6 text-center">
+                    <h2 class="text-3xl font-bold text-white mb-2">Secure Your Spot</h2>
+                    <p class="text-slate-400">Join the event of the century.</p>
+                </div>
+
+                <form id="registration-form" class="space-y-5">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-1">Full Name</label>
+                        <input type="text" id="reg-name" required class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all" placeholder="Jane Doe">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-1">Email Address</label>
+                        <input type="email" id="reg-email" required class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all" placeholder="jane@example.com">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-1">Job Role / Title</label>
+                        <input type="text" id="reg-role" required class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all" placeholder="Frontend Engineer">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-1">Ticket Tier</label>
+                        <select id="reg-ticket" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all">
+                            <option value="General Admission">General Admission</option>
+                            <option value="VIP All Access">VIP All Access</option>
+                            <option value="Speaker">Speaker</option>
+                            <option value="Press Pass">Press Pass</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" id="reg-submit-btn" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 px-4 rounded-lg shadow-lg transform transition-all hover:scale-[1.02] flex items-center justify-center gap-2">
+                        <span>Complete Registration</span>
+                    </button>
+                    
+                    <button type="button" onclick="window.app.navigateTo('LANDING')" class="w-full py-2 text-sm text-slate-400 hover:text-white transition-colors">
+                        Cancel
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        <!-- VIEW: Ticket -->
+        <section id="view-ticket" class="view-section hidden-view flex flex-col items-center justify-center min-h-[70vh] px-4 animate-slide-up">
+            <div id="ticket-ai-msg" class="w-full max-w-md mb-6 p-4 bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-lg text-center hidden">
+                <p class="text-indigo-300 text-sm flex items-center justify-center gap-2">
+                    <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+                    AI Concierge
+                </p>
+                <p id="ticket-welcome-text" class="text-slate-200 mt-1 font-medium"></p>
+            </div>
+
+            <div class="w-full max-w-md bg-slate-900 rounded-3xl overflow-hidden shadow-2xl border border-slate-700 relative">
+                <!-- Header -->
+                <div id="ticket-header-bg" class="h-32 bg-gradient-to-r from-indigo-500 to-purple-600 p-6 relative">
+                    <div id="ticket-badge-type" class="absolute top-4 right-4 bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold text-white uppercase tracking-wider border border-white/10">
+                        General
+                    </div>
+                    <h1 class="text-white text-2xl font-bold mt-8 tracking-tight">EVENT HORIZON</h1>
+                    <p class="text-white/80 text-sm font-mono">2024 GLOBAL SUMMIT</p>
+                </div>
+
+                <!-- Content -->
+                <div class="p-8 bg-slate-900 relative">
+                    <!-- Rip Effect -->
+                    <div class="absolute top-0 left-0 w-full transform -translate-y-1/2 flex justify-between px-2">
+                        <!-- Generated via JS loops to save DOM space -->
+                         <div class="flex justify-between w-full" id="rip-dots"></div>
+                    </div>
+
+                    <div class="text-center space-y-1">
+                        <h2 id="ticket-attendee-name" class="text-2xl font-bold text-white">Attendee Name</h2>
+                        <p id="ticket-attendee-role" class="text-slate-400 text-sm">Role</p>
+                        <div id="ticket-persona-container" class="mt-2 hidden">
+                            <div class="inline-block bg-slate-800 px-3 py-1 rounded-full border border-slate-700">
+                                <span id="ticket-persona-text" class="bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-cyan-400 font-bold text-sm tracking-wide">
+                                    Persona
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- QR Code -->
+                    <div class="mt-8 flex flex-col items-center justify-center space-y-4">
+                        <div class="bg-white p-4 rounded-xl shadow-inner">
+                            <div id="qrcode-container"></div>
+                        </div>
+                        <p id="ticket-id-display" class="text-xs text-slate-500 font-mono tracking-widest">ID-123</p>
+                    </div>
+
+                    <div class="mt-8 pt-6 border-t border-slate-800 flex justify-between text-xs text-slate-500 uppercase tracking-widest">
+                        <div>
+                            <p class="text-slate-600 mb-1">Date</p>
+                            <p class="text-slate-300">OCT 15</p>
+                        </div>
+                        <div>
+                            <p class="text-slate-600 mb-1">Gate</p>
+                            <p class="text-slate-300">04-A</p>
+                        </div>
+                        <div>
+                            <p class="text-slate-600 mb-1">Seat</p>
+                            <p class="text-slate-300">GEN</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-3 w-full max-w-md mt-6">
+                <button onclick="window.app.shareWhatsApp()" class="w-full bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-transform transform hover:scale-[1.02] flex items-center justify-center gap-2">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.008-.57-.008-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+                    Send to WhatsApp
+                </button>
+
+                <button onclick="window.app.navigateTo('LANDING')" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium py-3 px-4 rounded-xl border border-slate-700 transition-colors">
+                    Back to Home
+                </button>
+            </div>
+        </section>
+
+        <!-- VIEW: Admin -->
+        <section id="view-admin" class="view-section hidden-view w-full max-w-6xl mx-auto space-y-8 animate-fade-in pb-12">
+            <div class="flex justify-between items-center mb-8 border-b border-slate-700 pb-6">
+                <div>
+                   <h2 class="text-3xl font-bold text-white">Gate Control</h2>
+                   <p class="text-slate-400">Organizing Committee Dashboard</p>
+                </div>
+                <button onclick="window.app.navigateTo('LANDING')" class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg transition-colors border border-slate-700 text-sm">
+                  Log Out
+                </button>
+            </div>
+        
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- Check-In Ops -->
+                <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 lg:col-span-1 shadow-xl flex flex-col">
+                   <h3 class="text-xl font-semibold text-white mb-6 flex items-center gap-2">
+                     <svg class="text-indigo-400 w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                     Check-In Ops
+                   </h3>
+                   
+                   <!-- Scanner Area -->
+                   <div class="mb-6">
+                       <div id="scanner-ui-placeholder">
+                            <button onclick="window.app.startScanner()" class="w-full py-6 border-2 border-dashed border-slate-600 rounded-xl flex flex-col items-center justify-center text-slate-400 hover:text-indigo-400 hover:border-indigo-500 hover:bg-slate-700/30 transition-all gap-2 group">
+                                <svg class="w-10 h-10 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                <span class="font-medium">Launch Scanner</span>
+                            </button>
+                       </div>
+                       <div id="scanner-ui-active" class="hidden relative bg-black rounded-lg overflow-hidden border-2 border-indigo-500">
+                           <div id="reader" class="w-full h-64"></div>
+                           <button onclick="window.app.stopScanner()" class="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full shadow-lg z-10">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                           </button>
+                       </div>
+                   </div>
+        
+                   <div class="text-center text-slate-500 text-sm my-2 separator relative flex items-center justify-center">
+                     <span class="bg-slate-800 px-2 z-10">OR MANUAL ENTRY</span>
+                     <div class="absolute w-full h-px bg-slate-700 top-1/2 left-0"></div>
+                   </div>
+                   
+                   <form onsubmit="event.preventDefault(); window.app.handleManualCheckIn();" class="space-y-4 mt-2">
+                     <div>
+                       <input type="text" id="manual-checkin-id" class="w-full bg-slate-900 border border-slate-600 text-white text-xl font-mono tracking-widest text-center py-3 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none uppercase placeholder:text-slate-600" placeholder="ENTER ID">
+                     </div>
+                     <button type="submit" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded-lg transition-all">
+                       Verify ID
+                     </button>
+                   </form>
+        
+                   <div id="checkin-status-msg" class="hidden mt-4 p-4 rounded-lg border text-center font-medium animate-fade-in"></div>
+        
+                   <div class="mt-auto pt-8">
+                     <div class="flex items-center justify-between text-slate-400 text-sm mb-2">
+                       <span>Event Capacity</span>
+                       <span class="font-mono" id="stats-capacity">0 / 0</span>
+                     </div>
+                     <div class="w-full bg-slate-900 h-2 rounded-full overflow-hidden">
+                       <div id="stats-progress-bar" class="h-full bg-emerald-500 transition-all duration-500" style="width: 0%"></div>
+                     </div>
+                   </div>
+                </div>
+        
+                <!-- Analytics Panel -->
+                <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 lg:col-span-2 shadow-xl flex flex-col">
+                   <h3 class="text-xl font-semibold text-white mb-6 flex items-center gap-2">
+                     <svg class="text-indigo-400 w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                     Live Analytics
+                   </h3>
+        
+                   <div class="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
+                     <!-- Chart -->
+                     <div class="h-64 md:h-auto min-h-[250px] relative flex flex-col items-center justify-center">
+                       <h4 class="text-sm text-slate-400 text-center mb-2">Ticket Distribution</h4>
+                       <div class="relative w-full h-full max-h-[250px] max-w-[250px]">
+                           <canvas id="distributionChart"></canvas>
+                       </div>
+                     </div>
+        
+                     <!-- List -->
+                     <div class="bg-slate-900/50 rounded-xl p-4 overflow-hidden flex flex-col">
+                       <h4 class="text-sm text-slate-400 mb-4 flex items-center gap-2">
+                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                         Recent Activity
+                       </h4>
+                       <div id="recent-activity-list" class="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+                         <div class="text-center text-slate-600 text-sm py-8">Waiting for first arrival...</div>
+                       </div>
+                     </div>
+                   </div>
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- Application Logic -->
+    <script type="module" src="./script.js"></script>
+</body>
 </html>

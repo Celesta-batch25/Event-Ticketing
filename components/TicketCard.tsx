@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import QRCode from 'qrcode';
 import { Attendee, TicketType } from '../types';
-import { QrCodeIcon, SparklesIcon } from './Icons';
+import { QrCodeIcon, SparklesIcon, WhatsAppIcon } from './Icons';
 import { getWelcomeMessage } from '../services/geminiService';
 
 interface TicketCardProps {
@@ -10,6 +11,7 @@ interface TicketCardProps {
 
 const TicketCard: React.FC<TicketCardProps> = ({ attendee, onBack }) => {
   const [welcomeMsg, setWelcomeMsg] = useState('');
+  const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
 
   useEffect(() => {
     const fetchMsg = async () => {
@@ -19,6 +21,30 @@ const TicketCard: React.FC<TicketCardProps> = ({ attendee, onBack }) => {
       }
     };
     fetchMsg();
+
+    // Generate real QR code
+    const generateQR = async () => {
+      try {
+        const qrData = JSON.stringify({
+          id: attendee.id,
+          name: attendee.fullName,
+          ticketType: attendee.ticketType,
+          event: "Event Horizon 2024"
+        });
+        const url = await QRCode.toDataURL(qrData, { 
+          margin: 1, 
+          width: 256,
+          color: {
+            dark: '#000000',
+            light: '#ffffff'
+          }
+        });
+        setQrCodeUrl(url);
+      } catch (err) {
+        console.error("Error generating QR code", err);
+      }
+    };
+    generateQR();
   }, [attendee]);
 
   const getGradient = (type: TicketType) => {
@@ -30,11 +56,17 @@ const TicketCard: React.FC<TicketCardProps> = ({ attendee, onBack }) => {
     }
   };
 
+  const shareToWhatsApp = () => {
+    const text = `🚀 Event Horizon Ticket\n\n👤 Name: ${attendee.fullName}\n🎫 Type: ${attendee.ticketType}\n🆔 Ref: ${attendee.id}\n\nPresent this message or your QR code at the gate!`;
+    const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
+  };
+
   return (
-    <div className="flex flex-col items-center justify-center w-full max-w-md mx-auto perspective-1000">
+    <div className="flex flex-col items-center justify-center w-full max-w-md mx-auto perspective-1000 pb-12">
       
       {welcomeMsg && (
-        <div className="mb-6 p-4 bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-lg text-center animate-fade-in">
+        <div className="mb-6 p-4 bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-lg text-center animate-fade-in w-full">
            <p className="text-indigo-300 text-sm flex items-center justify-center gap-2">
              <SparklesIcon className="w-4 h-4" /> AI Concierge
            </p>
@@ -76,22 +108,14 @@ const TicketCard: React.FC<TicketCardProps> = ({ attendee, onBack }) => {
 
           {/* QR Code Area */}
           <div className="mt-8 flex flex-col items-center justify-center space-y-4">
-            <div className="bg-white p-4 rounded-xl">
-               {/* Simulating QR Code visually */}
-               <div className="w-48 h-48 bg-white flex items-center justify-center relative overflow-hidden">
-                 <div className="absolute inset-0 grid grid-cols-6 grid-rows-6 gap-0.5 opacity-90">
-                    {[...Array(36)].map((_, i) => (
-                      <div key={i} className={`bg-black ${Math.random() > 0.5 ? 'opacity-100' : 'opacity-0'}`}></div>
-                    ))}
+            <div className="bg-white p-4 rounded-xl shadow-inner">
+               {qrCodeUrl ? (
+                 <img src={qrCodeUrl} alt="Ticket QR Code" className="w-48 h-48 object-contain" />
+               ) : (
+                 <div className="w-48 h-48 bg-slate-100 flex items-center justify-center">
+                    <QrCodeIcon className="w-8 h-8 text-slate-300 animate-pulse" />
                  </div>
-                 <div className="absolute inset-0 border-4 border-black"></div>
-                 <div className="absolute top-4 left-4 w-8 h-8 border-4 border-black bg-black"></div>
-                 <div className="absolute top-4 right-4 w-8 h-8 border-4 border-black bg-black"></div>
-                 <div className="absolute bottom-4 left-4 w-8 h-8 border-4 border-black bg-black"></div>
-                 <div className="z-10 bg-white p-1 rounded">
-                    <QrCodeIcon className="w-8 h-8 text-black" />
-                 </div>
-               </div>
+               )}
             </div>
             <p className="text-xs text-slate-500 font-mono tracking-widest">{attendee.id}</p>
           </div>
@@ -113,12 +137,22 @@ const TicketCard: React.FC<TicketCardProps> = ({ attendee, onBack }) => {
         </div>
       </div>
       
-      <button 
-        onClick={onBack}
-        className="mt-8 text-slate-400 hover:text-white transition-colors text-sm underline underline-offset-4"
-      >
-        Return to Home
-      </button>
+      <div className="flex flex-col gap-3 w-full mt-6">
+        <button 
+          onClick={shareToWhatsApp}
+          className="w-full bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-transform transform hover:scale-[1.02] flex items-center justify-center gap-2"
+        >
+          <WhatsAppIcon className="w-5 h-5" />
+          Send to WhatsApp
+        </button>
+
+        <button 
+          onClick={onBack}
+          className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium py-3 px-4 rounded-xl border border-slate-700 transition-colors"
+        >
+          Back to Portal
+        </button>
+      </div>
     </div>
   );
 };
