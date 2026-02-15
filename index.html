@@ -22,11 +22,10 @@
   "imports": {
     "@google/genai": "https://esm.sh/@google/genai@^1.41.0",
     "react": "https://esm.sh/react@^19.2.4",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
     "react/": "https://esm.sh/react@^19.2.4/",
-    "recharts": "https://esm.sh/recharts@^3.7.0",
+    "qrcode": "https://esm.sh/qrcode@^1.5.4",
     "html5-qrcode": "https://esm.sh/html5-qrcode@^2.3.8",
-    "qrcode": "https://esm.sh/qrcode@^1.5.4"
+    "recharts": "https://esm.sh/recharts@^3.7.0"
   }
 }
 </script>
@@ -87,7 +86,7 @@
         
         <!-- Navbar -->
         <nav class="flex justify-between items-center py-6 mb-4">
-            <div onclick="window.app.navigateTo('LANDING')" class="text-xl font-bold tracking-tighter flex items-center gap-2 cursor-pointer select-none">
+            <div onclick="window.location.href = window.location.pathname" class="text-xl font-bold tracking-tighter flex items-center gap-2 cursor-pointer select-none">
                 <div class="w-8 h-8 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center text-xs font-bold shadow-lg shadow-indigo-500/30 text-white">EH</div>
                 <span>EventHorizon</span>
             </div>
@@ -96,20 +95,20 @@
             </div>
         </nav>
 
-        <!-- VIEW: Landing -->
+        <!-- VIEW: Landing (Gateway) -->
         <section id="view-landing" class="view-section flex flex-col items-center justify-center min-h-[70vh] text-center space-y-12 animate-fade-in px-4">
             <div class="space-y-4 max-w-3xl">
                 <h1 class="text-6xl md:text-7xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-indigo-200 to-indigo-400">
                     EVENT HORIZON
                 </h1>
                 <p class="text-xl md:text-2xl text-slate-400 font-light">
-                    The nexus of technology and imagination awaits.
+                    Select your portal to continue.
                 </p>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl mt-8">
                 <!-- Participant Card -->
-                <div onclick="window.app.navigateTo('REGISTER')" class="group bg-slate-800/50 backdrop-blur-sm border border-slate-700 hover:border-indigo-500 rounded-3xl p-8 cursor-pointer transition-all hover:transform hover:scale-105 hover:bg-slate-800 text-left relative overflow-hidden">
+                <div onclick="window.app.switchPortal('participant')" class="group bg-slate-800/50 backdrop-blur-sm border border-slate-700 hover:border-indigo-500 rounded-3xl p-8 cursor-pointer transition-all hover:transform hover:scale-105 hover:bg-slate-800 text-left relative overflow-hidden">
                     <div class="absolute top-0 right-0 p-32 bg-indigo-500/10 rounded-full blur-3xl group-hover:bg-indigo-500/20 transition-all"></div>
                     <div class="relative z-10">
                         <div class="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-indigo-500/20">
@@ -124,7 +123,7 @@
                 </div>
 
                 <!-- Admin Card -->
-                <div onclick="window.app.navigateTo('ADMIN')" class="group bg-slate-800/50 backdrop-blur-sm border border-slate-700 hover:border-emerald-500 rounded-3xl p-8 cursor-pointer transition-all hover:transform hover:scale-105 hover:bg-slate-800 text-left relative overflow-hidden">
+                <div onclick="window.app.switchPortal('admin')" class="group bg-slate-800/50 backdrop-blur-sm border border-slate-700 hover:border-emerald-500 rounded-3xl p-8 cursor-pointer transition-all hover:transform hover:scale-105 hover:bg-slate-800 text-left relative overflow-hidden">
                     <div class="absolute top-0 right-0 p-32 bg-emerald-500/10 rounded-full blur-3xl group-hover:bg-emerald-500/20 transition-all"></div>
                     <div class="relative z-10">
                         <div class="w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-emerald-500/20">
@@ -140,11 +139,11 @@
             </div>
         </section>
 
-        <!-- VIEW: Registration -->
+        <!-- VIEW: Registration (Participant) -->
         <section id="view-register" class="view-section hidden-view flex flex-col items-center justify-center min-h-[70vh] px-4 animate-slide-up w-full">
             <div class="w-full max-w-md mb-4">
-                <button onclick="window.app.navigateTo('LANDING')" class="text-slate-400 hover:text-white flex items-center gap-2 mb-4 transition-colors">
-                    &larr; Back to Home
+                <button onclick="window.app.switchPortal('')" class="text-slate-400 hover:text-white flex items-center gap-2 mb-4 transition-colors">
+                    &larr; Switch Portal
                 </button>
             </div>
             
@@ -181,18 +180,18 @@
                         <span>Complete Registration</span>
                     </button>
                     
-                    <button type="button" onclick="window.app.navigateTo('LANDING')" class="w-full py-2 text-sm text-slate-400 hover:text-white transition-colors">
+                    <button type="button" onclick="window.app.switchPortal('')" class="w-full py-2 text-sm text-slate-400 hover:text-white transition-colors">
                         Cancel
                     </button>
                 </form>
             </div>
         </section>
 
-        <!-- VIEW: Ticket -->
+        <!-- VIEW: Ticket (Participant) -->
         <section id="view-ticket" class="view-section hidden-view flex flex-col items-center justify-center min-h-[70vh] px-4 animate-slide-up">
             <div id="ticket-ai-msg" class="w-full max-w-md mb-6 p-4 bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-lg text-center hidden">
                 <p class="text-indigo-300 text-sm flex items-center justify-center gap-2">
-                    <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+                    <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L12 3Z"/></svg>
                     AI Concierge
                 </p>
                 <p id="ticket-welcome-text" class="text-slate-200 mt-1 font-medium"></p>
@@ -259,22 +258,28 @@
                     Send to WhatsApp
                 </button>
 
-                <button onclick="window.app.navigateTo('LANDING')" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium py-3 px-4 rounded-xl border border-slate-700 transition-colors">
-                    Back to Home
+                <button onclick="window.app.navigateTo('REGISTER')" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium py-3 px-4 rounded-xl border border-slate-700 transition-colors">
+                    Back to Register
                 </button>
             </div>
         </section>
 
-        <!-- VIEW: Admin -->
+        <!-- VIEW: Admin Dashboard -->
         <section id="view-admin" class="view-section hidden-view w-full max-w-6xl mx-auto space-y-8 animate-fade-in pb-12">
             <div class="flex justify-between items-center mb-8 border-b border-slate-700 pb-6">
                 <div>
                    <h2 class="text-3xl font-bold text-white">Gate Control</h2>
                    <p class="text-slate-400">Organizing Committee Dashboard</p>
                 </div>
-                <button onclick="window.app.navigateTo('LANDING')" class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg transition-colors border border-slate-700 text-sm">
-                  Log Out
-                </button>
+                <div class="flex gap-2">
+                    <button onclick="window.app.navigateTo('ADMIN_LIST')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg transition-colors border border-transparent text-sm flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                        All Registrations
+                    </button>
+                    <button onclick="window.app.switchPortal('')" class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg transition-colors border border-slate-700 text-sm">
+                      Switch Portal
+                    </button>
+                </div>
             </div>
         
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -355,6 +360,42 @@
                        </div>
                      </div>
                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- VIEW: Admin List -->
+        <section id="view-admin_list" class="view-section hidden-view w-full max-w-6xl mx-auto space-y-8 animate-fade-in pb-12">
+            <div class="flex justify-between items-center mb-8 border-b border-slate-700 pb-6">
+                <div>
+                   <h2 class="text-3xl font-bold text-white">All Registrations</h2>
+                   <p class="text-slate-400">Complete attendee database</p>
+                </div>
+                <button onclick="window.app.navigateTo('ADMIN')" class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg transition-colors border border-slate-700 text-sm flex items-center gap-2">
+                    &larr; Back to Dashboard
+                </button>
+            </div>
+
+            <div class="bg-slate-800 rounded-2xl border border-slate-700 shadow-xl overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-900/50 border-b border-slate-700 text-slate-400 text-xs uppercase tracking-wider">
+                                <th class="p-4">ID</th>
+                                <th class="p-4">Name</th>
+                                <th class="p-4">Role</th>
+                                <th class="p-4">Ticket Type</th>
+                                <th class="p-4">Status</th>
+                                <th class="p-4">Check-in Time</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-attendee-list-body" class="text-sm text-slate-300 divide-y divide-slate-700">
+                            <!-- Populated via JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="admin-list-empty" class="p-8 text-center text-slate-500 hidden">
+                    No registered attendees yet.
                 </div>
             </div>
         </section>

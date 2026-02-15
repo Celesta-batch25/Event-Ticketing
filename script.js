@@ -6,19 +6,17 @@ const appState = {
     attendees: [],
     currentTicket: null,
     html5QrcodeScanner: null,
-    chartInstance: null
+    chartInstance: null,
+    currentPortal: null // 'participant' or 'admin' or null (landing)
 };
 
 // --- Config ---
-// Handle environment variables safely for both bundler and browser environments
 let API_KEY = "";
 try {
     if (typeof process !== "undefined" && process.env && process.env.API_KEY) {
         API_KEY = process.env.API_KEY;
     }
-} catch (e) {
-    // process not defined, ignore
-}
+} catch (e) {}
 
 // --- Gemini Service ---
 const getClient = () => {
@@ -32,39 +30,62 @@ const getClient = () => {
 async function generateBadgePersona(name, role, ticketType) {
     const client = getClient();
     if (!client) return "Tech Enthusiast";
-
     try {
         const prompt = `Create a short, cool, and slightly futuristic "Badge Persona" or "Callsign" (max 3-4 words) for an event attendee. Name: ${name}, Role: ${role}, Ticket: ${ticketType}. Return ONLY the string.`;
-        const response = await client.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: prompt,
-        });
+        const response = await client.models.generateContent({ model: 'gemini-3-flash-preview', contents: prompt });
         return response.text?.trim() || "Future Walker";
-    } catch (e) {
-        console.error(e);
-        return "Future Walker";
-    }
+    } catch (e) { return "Future Walker"; }
 }
 
 async function getWelcomeMessage(name, persona) {
     const client = getClient();
     if (!client) return `Welcome, ${name}!`;
-
     try {
         const prompt = `Write a 1 sentence high-energy cyberpunk welcome message for User: ${name}, Persona: ${persona}.`;
-        const response = await client.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: prompt,
-        });
+        const response = await client.models.generateContent({ model: 'gemini-3-flash-preview', contents: prompt });
         return response.text?.trim() || `Welcome to the future, ${name}.`;
-    } catch (e) {
-        return `Welcome to the future, ${name}.`;
-    }
+    } catch (e) { return `Welcome to the future, ${name}.`; }
 }
 
-// --- Navigation & UI Logic ---
+// --- App Logic ---
 
 window.app = {
+    // Determine which "Portal" we are in based on URL params
+    init: () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const portal = urlParams.get('portal');
+        
+        if (portal === 'admin') {
+            window.app.switchPortal('admin');
+        } else if (portal === 'participant') {
+            window.app.switchPortal('participant');
+        } else {
+            // Default to landing
+            window.app.navigateTo('LANDING');
+        }
+    },
+
+    switchPortal: (portal) => {
+        appState.currentPortal = portal;
+        // Update URL without reload to allow bookmarking
+        const url = new URL(window.location);
+        if (portal) {
+            url.searchParams.set('portal', portal);
+        } else {
+            url.searchParams.delete('portal');
+        }
+        window.history.pushState({}, '', url);
+
+        // Reset state slightly when switching portals if needed
+        if (portal === 'admin') {
+            window.app.navigateTo('ADMIN');
+        } else if (portal === 'participant') {
+            window.app.navigateTo('REGISTER');
+        } else {
+            window.app.navigateTo('LANDING');
+        }
+    },
+
     navigateTo: (viewName) => {
         appState.view = viewName;
         
@@ -77,19 +98,21 @@ window.app = {
 
         // Update Navbar Badge
         const navBadge = document.getElementById('nav-badge');
-        if (viewName === 'LANDING') {
+        if (!appState.currentPortal) {
             navBadge.classList.add('hidden');
         } else {
             navBadge.classList.remove('hidden');
-            navBadge.textContent = viewName === 'ADMIN' ? 'ADMIN MODE' : 'PARTICIPANT MODE';
+            navBadge.textContent = appState.currentPortal === 'admin' ? 'COMMITTEE PORTAL' : 'PARTICIPANT PORTAL';
         }
 
         // View Specific Logic
         if (viewName === 'ADMIN') {
             updateAdminDashboard();
+        } else if (viewName === 'ADMIN_LIST') {
+            updateAdminList();
         }
         
-        // Cleanup Scanner if leaving admin
+        // Cleanup Scanner
         if (viewName !== 'ADMIN' && appState.html5QrcodeScanner) {
             window.app.stopScanner();
         }
@@ -98,7 +121,7 @@ window.app = {
     shareWhatsApp: () => {
         if (!appState.currentTicket) return;
         const a = appState.currentTicket;
-        const text = `🚀 Event Horizon Ticket\n\n👤 Name: ${a.fullName}\n🎫 Type: ${a.ticketType}\n🆔 Ref: ${a.id}\n\nPresent this message or your QR code at the gate!`;
+        const text = `🎟️ *EVENT HORIZON TICKET*\n\n👤 *Name:* ${a.fullName}\n💼 *Role:* ${a.role}\n🎫 *Type:* ${a.ticketType}\n🆔 *ID:* ${a.id}\n\n🤖 *Persona:* ${a.aiPersona || 'N/A'}\n\n_Show this code at Gate 04-A to enter._`;
         window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
     },
 
@@ -111,8 +134,7 @@ window.app = {
             try {
                 const data = JSON.parse(decodedText);
                 if (data.id) id = data.id;
-            } catch(e) {} // Not JSON, use raw text
-            
+            } catch(e) {} 
             processCheckIn(id);
         };
 
@@ -139,7 +161,6 @@ window.app = {
 };
 
 // --- Registration Logic ---
-
 const form = document.getElementById('registration-form');
 if (form) {
     form.addEventListener('submit', async (e) => {
@@ -147,7 +168,6 @@ if (form) {
         const btn = document.getElementById('reg-submit-btn');
         const originalText = btn.innerHTML;
         
-        // Loading State
         btn.disabled = true;
         btn.innerHTML = `<svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> <span>Generating Identity...</span>`;
         btn.classList.add('bg-indigo-700', 'cursor-not-allowed');
@@ -156,10 +176,8 @@ if (form) {
         const role = document.getElementById('reg-role').value;
         const type = document.getElementById('reg-ticket').value;
 
-        // 1. Generate Persona
         const persona = await generateBadgePersona(name, role, type);
 
-        // 2. Create Object
         const newAttendee = {
             id: Math.random().toString(36).substr(2, 9).toUpperCase(),
             fullName: name,
@@ -171,14 +189,11 @@ if (form) {
             checkInTime: null
         };
 
-        // 3. Save State
         appState.attendees.push(newAttendee);
         appState.currentTicket = newAttendee;
 
-        // 4. Render Ticket
         renderTicket(newAttendee);
 
-        // 5. Switch View
         btn.innerHTML = originalText;
         btn.disabled = false;
         btn.classList.remove('bg-indigo-700', 'cursor-not-allowed');
@@ -188,29 +203,23 @@ if (form) {
 }
 
 async function renderTicket(attendee) {
-    // Basic Info
     document.getElementById('ticket-attendee-name').textContent = attendee.fullName;
     document.getElementById('ticket-attendee-role').textContent = attendee.role;
     document.getElementById('ticket-badge-type').textContent = attendee.ticketType;
     document.getElementById('ticket-id-display').textContent = attendee.id;
 
-    // Gradient
     const header = document.getElementById('ticket-header-bg');
     header.className = `h-32 p-6 relative bg-gradient-to-r ${getGradient(attendee.ticketType)}`;
 
-    // Persona
     const personaContainer = document.getElementById('ticket-persona-container');
     if (attendee.aiPersona) {
         personaContainer.classList.remove('hidden');
         document.getElementById('ticket-persona-text').textContent = attendee.aiPersona;
-        
-        // Welcome Message
         const welcome = await getWelcomeMessage(attendee.fullName, attendee.aiPersona);
         document.getElementById('ticket-ai-msg').classList.remove('hidden');
         document.getElementById('ticket-welcome-text').textContent = welcome;
     }
 
-    // QR Code
     const qrContainer = document.getElementById('qrcode-container');
     qrContainer.innerHTML = '';
     const qrData = JSON.stringify({
@@ -254,14 +263,12 @@ function processCheckIn(id) {
             msgEl.textContent = `${attendee.fullName} already checked in.`;
             msgEl.classList.add('bg-red-500/10', 'text-red-400', 'border-red-500/20');
         } else {
-            // Success
             attendee.status = 'Checked In';
             attendee.checkInTime = new Date().toISOString();
             msgEl.textContent = `Welcome, ${attendee.fullName}!`;
             msgEl.classList.add('bg-emerald-500/10', 'text-emerald-400', 'border-emerald-500/20');
         }
     }
-    
     updateAdminDashboard();
     setTimeout(() => msgEl.classList.add('hidden'), 3000);
 }
@@ -270,12 +277,10 @@ function updateAdminDashboard() {
     const total = appState.attendees.length;
     const checkedIn = appState.attendees.filter(a => a.status === 'Checked In');
     
-    // 1. Progress Bar
     document.getElementById('stats-capacity').textContent = `${checkedIn.length} / ${total}`;
     const pct = total > 0 ? (checkedIn.length / total) * 100 : 0;
     document.getElementById('stats-progress-bar').style.width = `${pct}%`;
 
-    // 2. Recent Activity List
     const listEl = document.getElementById('recent-activity-list');
     listEl.innerHTML = '';
     const recent = [...checkedIn].reverse().slice(0, 5);
@@ -299,27 +304,57 @@ function updateAdminDashboard() {
             `;
         });
     }
-
-    // 3. Chart
     updateChart();
+}
+
+function updateAdminList() {
+    const tbody = document.getElementById('admin-attendee-list-body');
+    const emptyMsg = document.getElementById('admin-list-empty');
+    tbody.innerHTML = '';
+    
+    if (appState.attendees.length === 0) {
+        emptyMsg.classList.remove('hidden');
+        return;
+    }
+    emptyMsg.classList.add('hidden');
+
+    appState.attendees.forEach(a => {
+        const time = a.checkInTime ? new Date(a.checkInTime).toLocaleTimeString() : '-';
+        const statusClass = a.status === 'Checked In' 
+            ? 'bg-emerald-500/20 text-emerald-400' 
+            : 'bg-indigo-500/20 text-indigo-400';
+
+        tbody.innerHTML += `
+            <tr class="hover:bg-slate-700/30 transition-colors">
+                <td class="p-4 font-mono text-xs text-slate-500">${a.id}</td>
+                <td class="p-4 font-medium text-white">${a.fullName}</td>
+                <td class="p-4 text-slate-400">${a.role}</td>
+                <td class="p-4">
+                    <span class="px-2 py-1 rounded text-xs border border-white/10 bg-slate-800">
+                        ${a.ticketType}
+                    </span>
+                </td>
+                <td class="p-4">
+                    <span class="px-2 py-1 rounded text-xs font-bold ${statusClass}">
+                        ${a.status}
+                    </span>
+                </td>
+                <td class="p-4 text-slate-400 font-mono text-xs">${time}</td>
+            </tr>
+        `;
+    });
 }
 
 function updateChart() {
     const ctx = document.getElementById('distributionChart');
-    // Ensure element exists before using
     if (!ctx) return;
-
     const counts = {};
-    appState.attendees.forEach(a => {
-        counts[a.ticketType] = (counts[a.ticketType] || 0) + 1;
-    });
+    appState.attendees.forEach(a => { counts[a.ticketType] = (counts[a.ticketType] || 0) + 1; });
     
     const labels = Object.keys(counts);
     const data = Object.values(counts);
 
-    if (appState.chartInstance) {
-        appState.chartInstance.destroy();
-    }
+    if (appState.chartInstance) appState.chartInstance.destroy();
 
     appState.chartInstance = new Chart(ctx.getContext('2d'), {
         type: 'doughnut',
@@ -342,7 +377,7 @@ function updateChart() {
     });
 }
 
-// Decoration: Create rip dots for ticket
+// Init Decoration and App
 const ripDots = document.getElementById('rip-dots');
 if (ripDots) {
     for(let i=0; i<20; i++) {
@@ -351,3 +386,6 @@ if (ripDots) {
         ripDots.appendChild(dot);
     }
 }
+
+// Start Routing Logic on Load
+window.addEventListener('load', window.app.init);
