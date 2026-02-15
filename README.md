@@ -1,20 +1,49 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
 
-# Run and deploy your AI Studio app
+# Event Horizon Ticketing System
 
-This contains everything you need to run your app locally.
+A full-stack event registration and check-in system featuring:
+- **Participant Portal**: Registration with AI-generated badge personas.
+- **Committee Portal**: Admin dashboard, QR code scanner, and real-time analytics.
+- **Backend**: Node.js (Express) + SQLite database.
 
-View your app in AI Studio: https://ai.studio/apps/drive/1reaBLZr36aVBMevgs2BLyjAewcVA5sX1
+## 🚀 How to Run on GitHub (Codespaces)
 
-## Run Locally
+1. Go to the GitHub repository for this project.
+2. Click the green **Code** button.
+3. Select the **Codespaces** tab.
+4. Click **Create codespace on main**.
+5. Wait for the environment to build.
+6. Once the terminal opens, run:
+   ```bash
+   npm start
+   ```
+7. A popup will appear saying "Open in Browser". Click it to view the app.
 
-**Prerequisites:**  Node.js
+## 💻 How to Run Locally
 
+1. Clone the repository.
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Start the server:
+   ```bash
+   npm start
+   ```
+4. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## 📱 Accessing from Mobile (Local Network)
+
+To test the QR scanner on your phone:
+1. Ensure your phone and computer are on the same Wi-Fi.
+2. Find your computer's local IP address (e.g., `192.168.1.5`).
+3. Run the server.
+4. On your phone, visit: `http://192.168.1.5:3000`.
+
+## API Key Configuration
+
+To use the AI Persona features, create a file named `.env` in the root directory (or export the variable in your terminal):
+
+```
+API_KEY=your_google_gemini_api_key
+```

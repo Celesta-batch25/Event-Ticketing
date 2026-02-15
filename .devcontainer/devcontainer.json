@@ -1,0 +1,19 @@
+
+{
+	"name": "Event Horizon Ticketing",
+	"image": "mcr.microsoft.com/devcontainers/javascript-node:1-18-bullseye",
+	"forwardPorts": [3000],
+	"portsAttributes": {
+		"3000": {
+			"label": "Application",
+			"onAutoForward": "notify"
+		}
+	},
+	"postCreateCommand": "npm install",
+	"customizations": {
+		"vscode": {
+			"settings": {},
+			"extensions": []
+		}
+	}
+}
