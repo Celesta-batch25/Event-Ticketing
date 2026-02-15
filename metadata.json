@@ -1,0 +1,7 @@
+{
+  "name": "EventHorizon Ticketing",
+  "description": "A modern, AI-powered event registration and gate check-in system featuring personalized badge generation and real-time attendee analytics.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
