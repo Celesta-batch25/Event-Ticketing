@@ -3,11 +3,12 @@ import { GoogleGenAI } from "@google/genai";
 // --- State Management ---
 const appState = {
     view: 'LANDING',
-    attendees: [],
+    attendees: [], // Now synced with DB
     currentTicket: null,
     html5QrcodeScanner: null,
     chartInstance: null,
-    currentPortal: null // 'participant' or 'admin' or null (landing)
+    currentPortal: null,
+    apiBase: '/api' // Relative path for proxying
 };
 
 // --- Config ---
@@ -47,10 +48,34 @@ async function getWelcomeMessage(name, persona) {
     } catch (e) { return `Welcome to the future, ${name}.`; }
 }
 
+// --- API Helpers ---
+const api = {
+    register: async (attendee) => {
+        const res = await fetch(`${appState.apiBase}/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(attendee)
+        });
+        return res.json();
+    },
+    checkIn: async (id) => {
+        const res = await fetch(`${appState.apiBase}/checkin`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, checkInTime: new Date().toISOString() })
+        });
+        return res.json();
+    },
+    getAll: async () => {
+        const res = await fetch(`${appState.apiBase}/attendees`);
+        const data = await res.json();
+        return data.data || [];
+    }
+};
+
 // --- App Logic ---
 
 window.app = {
-    // Determine which "Portal" we are in based on URL params
     init: () => {
         const urlParams = new URLSearchParams(window.location.search);
         const portal = urlParams.get('portal');
@@ -60,14 +85,12 @@ window.app = {
         } else if (portal === 'participant') {
             window.app.switchPortal('participant');
         } else {
-            // Default to landing
             window.app.navigateTo('LANDING');
         }
     },
 
-    switchPortal: (portal) => {
+    switchPortal: async (portal) => {
         appState.currentPortal = portal;
-        // Update URL without reload to allow bookmarking
         const url = new URL(window.location);
         if (portal) {
             url.searchParams.set('portal', portal);
@@ -76,8 +99,9 @@ window.app = {
         }
         window.history.pushState({}, '', url);
 
-        // Reset state slightly when switching portals if needed
         if (portal === 'admin') {
+            // Fetch latest data when entering admin
+            appState.attendees = await api.getAll();
             window.app.navigateTo('ADMIN');
         } else if (portal === 'participant') {
             window.app.navigateTo('REGISTER');
@@ -86,17 +110,13 @@ window.app = {
         }
     },
 
-    navigateTo: (viewName) => {
+    navigateTo: async (viewName) => {
         appState.view = viewName;
         
-        // Hide all views
         document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden-view'));
-        
-        // Show target view
         const target = document.getElementById(`view-${viewName.toLowerCase()}`);
         if(target) target.classList.remove('hidden-view');
 
-        // Update Navbar Badge
         const navBadge = document.getElementById('nav-badge');
         if (!appState.currentPortal) {
             navBadge.classList.add('hidden');
@@ -105,14 +125,15 @@ window.app = {
             navBadge.textContent = appState.currentPortal === 'admin' ? 'COMMITTEE PORTAL' : 'PARTICIPANT PORTAL';
         }
 
-        // View Specific Logic
         if (viewName === 'ADMIN') {
+            // Refresh data frequently in dashboard
+            appState.attendees = await api.getAll();
             updateAdminDashboard();
         } else if (viewName === 'ADMIN_LIST') {
+            appState.attendees = await api.getAll();
             updateAdminList();
         }
         
-        // Cleanup Scanner
         if (viewName !== 'ADMIN' && appState.html5QrcodeScanner) {
             window.app.stopScanner();
         }
@@ -189,16 +210,22 @@ if (form) {
             checkInTime: null
         };
 
-        appState.attendees.push(newAttendee);
-        appState.currentTicket = newAttendee;
-
-        renderTicket(newAttendee);
-
-        btn.innerHTML = originalText;
-        btn.disabled = false;
-        btn.classList.remove('bg-indigo-700', 'cursor-not-allowed');
-        form.reset();
-        window.app.navigateTo('TICKET');
+        // SAVE TO DB
+        try {
+            await api.register(newAttendee);
+            appState.attendees.push(newAttendee);
+            appState.currentTicket = newAttendee;
+            renderTicket(newAttendee);
+            form.reset();
+            window.app.navigateTo('TICKET');
+        } catch (error) {
+            console.error(error);
+            alert("Registration failed. Please try again.");
+        } finally {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+            btn.classList.remove('bg-indigo-700', 'cursor-not-allowed');
+        }
     });
 }
 
@@ -249,27 +276,27 @@ function getGradient(type) {
 
 // --- Admin Logic ---
 
-function processCheckIn(id) {
-    const idx = appState.attendees.findIndex(a => a.id === id);
+async function processCheckIn(id) {
     const msgEl = document.getElementById('checkin-status-msg');
     msgEl.classList.remove('hidden', 'bg-emerald-500/10', 'text-emerald-400', 'border-emerald-500/20', 'bg-red-500/10', 'text-red-400', 'border-red-500/20');
 
-    if (idx === -1) {
-        msgEl.textContent = `ID ${id} NOT FOUND`;
-        msgEl.classList.add('bg-red-500/10', 'text-red-400', 'border-red-500/20');
-    } else {
-        const attendee = appState.attendees[idx];
-        if (attendee.status === 'Checked In') {
-            msgEl.textContent = `${attendee.fullName} already checked in.`;
+    try {
+        const result = await api.checkIn(id);
+        if (result.error) {
+            msgEl.textContent = result.error;
             msgEl.classList.add('bg-red-500/10', 'text-red-400', 'border-red-500/20');
         } else {
-            attendee.status = 'Checked In';
-            attendee.checkInTime = new Date().toISOString();
-            msgEl.textContent = `Welcome, ${attendee.fullName}!`;
+            msgEl.textContent = `Welcome, ${result.data.fullName}!`;
             msgEl.classList.add('bg-emerald-500/10', 'text-emerald-400', 'border-emerald-500/20');
+            // Refresh list
+            appState.attendees = await api.getAll();
+            updateAdminDashboard();
         }
+    } catch (e) {
+        msgEl.textContent = "Network Error";
+        msgEl.classList.add('bg-red-500/10', 'text-red-400', 'border-red-500/20');
     }
-    updateAdminDashboard();
+    
     setTimeout(() => msgEl.classList.add('hidden'), 3000);
 }
 
